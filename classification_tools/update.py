@@ -85,9 +85,7 @@ def update_data(output_file=False, clean=False):
     all_tactics = lift.remove_deprecated(all_tactics)
     code_tactics = [x["external_references"][0]["external_id"] for x in all_tactics]
     name_tactics = [x["name"] for x in all_tactics]
-    slug_name_tactics = [
-        x["x_mitre_shortname"].lower().replace(" ", "-") for x in all_tactics
-    ]
+    slug_name_tactics = [x["x_mitre_shortname"] for x in all_tactics]
     code_techniques = []
     name_techniques = []
     stix_ids = []
@@ -105,7 +103,9 @@ def update_data(output_file=False, clean=False):
         for url in technique["external_references"][1:]:
             if url.get("url", None):
                 urls.setdefault(url["url"], {})
-                urls[url["url"]][tactic_id] = 1
+                for tactic in technique["tactic"]:
+                    tactic_id = code_tactics[slug_name_tactics.index(tactic)]
+                    urls[url["url"]][tactic_id] = 1
                 urls[url["url"]][technique_id] = 1
 
     if output_file:
