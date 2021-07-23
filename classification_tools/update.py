@@ -80,34 +80,60 @@ def update_data(output_file=False, clean=False):
     all_techniques = lift.get_techniques(stix_format=False)
     all_techniques = lift.remove_revoked(all_techniques)
     all_techniques = lift.remove_deprecated(all_techniques)
-    all_tactics = lift.get_tactics()
-    all_tactics = lift.remove_revoked(all_tactics)
-    all_tactics = lift.remove_deprecated(all_tactics)
-    code_tactics = [x["external_references"][0]["external_id"] for x in all_tactics]
-    name_tactics = [x["name"] for x in all_tactics]
-    slug_name_tactics = [x["x_mitre_shortname"] for x in all_tactics]
+    all_tactics = []
+    for (tact_fun, tact_type) in [
+        (lift.get_ics_tactics, "ics"),
+        (lift.get_pre_tactics, "pre"),
+        (lift.get_mobile_tactics, "mobile"),
+        (lift.get_enterprise_tactics, "enterprise"),
+    ]:
+        tmp_tactics = tact_fun()
+        tmp_tactics = lift.remove_revoked(tmp_tactics)
+        tmp_tactics = lift.remove_deprecated(tmp_tactics)
+        for x in tmp_tactics:
+            all_tactics.append((x, tact_type))
+    code_tactics = [x[0]["external_references"][0]["external_id"] for x in all_tactics]
+    name_tactics = ["{} [{}]".format(x[0]["name"], x[1]) for x in all_tactics]
+    slug_name_tactics = [
+        "{}{}".format(
+            x[0]["x_mitre_shortname"],
+            "-{}".format(x[1]) if x[1] not in ["enterprise", "ics"] else "",
+        )
+        for x in all_tactics
+    ]
     code_techniques = []
     name_techniques = []
     stix_ids = []
     relation_df = {}
     urls = {}
     for technique in tqdm(all_techniques):
+        stix_ids.append(technique["id"])
         technique_id = technique["external_references"][0]["external_id"]
         code_techniques.append(technique_id)
         name_techniques.append(technique["technique"])
         for tactic in technique["tactic"]:
+            tact_type = (
+                technique["matrix"]
+                .replace("mitre", "")
+                .replace("attack", "")
+                .replace("-", "")
+            )
+            tactic = "{}{}".format(
+                tactic,
+                "-{}".format(tact_type) if tact_type not in ["", "ics"] else "",
+            )
+
             tactic_id = code_tactics[slug_name_tactics.index(tactic)]
             relation_df.setdefault(tactic_id, [])
             relation_df[tactic_id].append(technique_id)
-        stix_ids.append(technique["id"])
-        for url in technique["external_references"][1:]:
-            if url.get("url", None):
-                urls.setdefault(url["url"], {})
-                for tactic in technique["tactic"]:
-                    tactic_id = code_tactics[slug_name_tactics.index(tactic)]
-                    urls[url["url"]][tactic_id] = 1
-                urls[url["url"]][technique_id] = 1
 
+            for url_obj in technique["external_references"][1:]:
+                url = url_obj.get("url", None)
+                if url:
+                    urls.setdefault(url, {})
+                    urls[url][tactic_id] = 1
+                    urls[url][technique_id] = 1
+            
     if output_file:
         df = pd.DataFrame(urls)
         df = df.transpose()
