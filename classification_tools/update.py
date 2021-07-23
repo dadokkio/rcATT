@@ -74,7 +74,8 @@ def update_data(output_file=False, clean=False):
     lift = attack_client()
     config = configparser.ConfigParser()
 
-    os.mkdir(TMP_PATH)
+    if not os.path.exists(TMP_PATH):
+        os.mkdir(TMP_PATH)
 
     all_techniques = lift.get_techniques(stix_format=False)
     all_techniques = lift.remove_revoked(all_techniques)
@@ -105,6 +106,7 @@ def update_data(output_file=False, clean=False):
             if url.get("url", None):
                 urls.setdefault(url["url"], {})
                 urls[url["url"]][tactic_id] = 1
+                urls[url["url"]][technique_id] = 1
 
     if output_file:
         df = pd.DataFrame(urls)
@@ -115,18 +117,21 @@ def update_data(output_file=False, clean=False):
         with TqdmCallback(desc="compute"):
             df2 = dd.from_pandas(df, npartitions=200)
             df2["Text"] = df2["index"].apply(parse_report)
-            # df2 = df2.set_index("index")
+            df2 = df2.dropna(subset=["Text"])
             df2.to_csv("data/{}".format(output_file), single_file=True, index=False)
 
+    else:
+        output_file = "new_set.csv"
+
     config["VARIABLES"] = {
-        "CODE_TACTICS": code_tactics,
-        "NAME_TACTICS": name_tactics,
-        "CODE_TECHNIQUES": code_techniques,
-        "NAME_TECHNIQUES": name_techniques,
-        "STIX_IDENTIFIERS": stix_ids,
+        "CODE_TACTICS": ",".join(code_tactics),
+        "NAME_TACTICS": ",".join(name_tactics),
+        "CODE_TECHNIQUES": ",".join(code_techniques),
+        "NAME_TECHNIQUES": ",".join(name_techniques),
+        "STIX_IDENTIFIERS": ",".join(stix_ids),
         "RELATIONSHIP": relation_df,
-        "TEXT_FEATURES": ["processed"],
-        "ALL_TTPS": code_tactics + code_techniques,
+        "TEXT_FEATURES": "processed",
+        "ALL_TTPS": ",".join(code_tactics + code_techniques),
     }
     config["PATH"] = {
         "TRAINING_FILE": "classification_tools/data/{}".format(output_file),

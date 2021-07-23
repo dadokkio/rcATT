@@ -9,6 +9,7 @@
 # Date:       2019_10_22
 # Important global constants and functions for
 # classifications: training and prediction.
+import ast
 import joblib
 import configparser
 import pandas as pd
@@ -29,16 +30,18 @@ import classification_tools.postprocessing as pop
 ##########################################################
 
 config = configparser.ConfigParser()
-config.read("rcatt.ini")
+config.read("classification_tools/rcatt.ini")
 
-TEXT_FEATURES = config["VARIABLES"]["TEXT_FEATURES"]
-CODE_TACTICS = config["VARIABLES"]["CODE_TACTICS"]
-NAME_TACTICS = config["VARIABLES"]["NAME_TACTICS"]
-CODE_TECHNIQUES = config["VARIABLES"]["CODE_TECHNIQUES"]
-NAME_TECHNIQUES = config["VARIABLES"]["NAME_TECHNIQUES"]
-STIX_IDENTIFIERS = config["VARIABLES"]["STIX_IDENTIFIERS"]
-TACTICS_TECHNIQUES_RELATIONSHIP_DF = config["VARIABLES"]["RELATIONSHIP"]
-ALL_TTPS = config["VARIABLES"]["ALL_TTPS"]
+TEXT_FEATURES = config["VARIABLES"]["TEXT_FEATURES"].split(",")
+CODE_TACTICS = config["VARIABLES"]["CODE_TACTICS"].split(",")
+NAME_TACTICS = config["VARIABLES"]["NAME_TACTICS"].split(",")
+CODE_TECHNIQUES = config["VARIABLES"]["CODE_TECHNIQUES"].split(",")
+NAME_TECHNIQUES = config["VARIABLES"]["NAME_TECHNIQUES"].split(",")
+STIX_IDENTIFIERS = config["VARIABLES"]["STIX_IDENTIFIERS"].split(",")
+TACTICS_TECHNIQUES_RELATIONSHIP_DF = ast.literal_eval(
+    config["VARIABLES"]["RELATIONSHIP"]
+)
+ALL_TTPS = config["VARIABLES"]["ALL_TTPS"].split(",")
 
 TRAINING_FILE = config["PATH"]["TRAINING_FILE"]
 ADDED_FILE = config["PATH"]["ADDED_FILE"]
@@ -94,6 +97,9 @@ def train(cmd):
     train_data_df.append(train_data_added, ignore_index=True)
 
     train_data_df = prp.processing(train_data_df)
+
+    print(train_data_df.head())
+    print(train_data_df.columns, train_data_df.index)
 
     reports = train_data_df[TEXT_FEATURES]
     tactics = train_data_df[CODE_TACTICS]
