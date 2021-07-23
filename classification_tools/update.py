@@ -83,7 +83,6 @@ def update_data(output_file=False, clean=False):
     all_tactics = []
     for (tact_fun, tact_type) in [
         (lift.get_ics_tactics, "ics"),
-        (lift.get_pre_tactics, "pre"),
         (lift.get_mobile_tactics, "mobile"),
         (lift.get_enterprise_tactics, "enterprise"),
     ]:
@@ -125,15 +124,15 @@ def update_data(output_file=False, clean=False):
 
             tactic_id = code_tactics[slug_name_tactics.index(tactic)]
             relation_df.setdefault(tactic_id, [])
-            relation_df[tactic_id].append(technique_id)
-
-            for url_obj in technique["external_references"][1:]:
+            relation_df[tactic_id].append(technique_id)               
+            for url_obj in technique["external_references"]:
                 url = url_obj.get("url", None)
                 if url:
                     urls.setdefault(url, {})
                     urls[url][tactic_id] = 1
                     urls[url][technique_id] = 1
-            
+
+
     if output_file:
         df = pd.DataFrame(urls)
         df = df.transpose()

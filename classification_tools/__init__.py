@@ -98,9 +98,6 @@ def train(cmd):
 
     train_data_df = prp.processing(train_data_df)
 
-    print(train_data_df.head())
-    print(train_data_df.columns, train_data_df.index)
-
     reports = train_data_df[TEXT_FEATURES]
     tactics = train_data_df[CODE_TACTICS]
     techniques = train_data_df[CODE_TECHNIQUES]
