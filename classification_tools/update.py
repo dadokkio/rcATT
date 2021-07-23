@@ -1,6 +1,7 @@
 import configparser
 import argparse
 
+import os
 import uuid
 import requests
 import http.cookiejar
@@ -55,11 +56,12 @@ def parse_report(url):
             text = article.text
             logging.debug("[{}] {} OK".format(url, guessed_type))
         elif guessed_type == "application/pdf":
-            filename = "/tmp/aaa/{}.pdf".format(str(uuid.uuid4()))
+            filename = "/tmp/{}.pdf".format(str(uuid.uuid4()))
             with open(filename, "wb") as f:
                 f.write(response.content)
             raw = pdf_parser.from_file(filename)
             text = raw["content"].strip()
+            os.remove(filename)
             logging.debug("[{}] {} PDF OK".format(url, filename))
         else:
             logging.error("[{}] {}".format(url, guessed_type))
