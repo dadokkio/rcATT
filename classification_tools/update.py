@@ -2,6 +2,7 @@ import configparser
 import argparse
 
 import os
+import shutil
 import uuid
 import requests
 import http.cookiejar
@@ -22,12 +23,8 @@ logging.basicConfig(filename="rcatt.log", level=logging.WARNING)
 logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-##########################################################
-#       LABELS AND DATAFRAME LISTS AND RELATIONSHIP      #
-##########################################################
-
-TEXT_FEATURES = ["processed"]
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36"
+TMP_PATH = "/tmp/rcatt"
 
 
 def guess_type_of(link, strict=True):
@@ -56,12 +53,13 @@ def parse_report(url):
             text = article.text
             logging.debug("[{}] {} OK".format(url, guessed_type))
         elif guessed_type == "application/pdf":
-            filename = "/tmp/{}.pdf".format(str(uuid.uuid4()))
+            filename = "{}/{}.pdf".format(TMP_PATH, str(uuid.uuid4()))
             with open(filename, "wb") as f:
                 f.write(response.content)
             raw = pdf_parser.from_file(filename)
-            text = raw["content"].strip()
-            os.remove(filename)
+            text = raw["content"]
+            if text and type(text) == str:
+                text = text.strip()
             logging.debug("[{}] {} PDF OK".format(url, filename))
         else:
             logging.error("[{}] {}".format(url, guessed_type))
@@ -72,9 +70,12 @@ def parse_report(url):
         return None
 
 
-def update_data(output_file=False):
+def update_data(output_file=False, clean=False):
     lift = attack_client()
     config = configparser.ConfigParser()
+
+    os.mkdir(TMP_PATH)
+
     all_techniques = lift.get_techniques(stix_format=False)
     all_techniques = lift.remove_revoked(all_techniques)
     all_techniques = lift.remove_deprecated(all_techniques)
@@ -112,9 +113,9 @@ def update_data(output_file=False):
         df = df.reset_index()
         df.insert(1, "Text", value=None)
         with TqdmCallback(desc="compute"):
-            df2 = dd.from_pandas(df, npartitions=20)
+            df2 = dd.from_pandas(df, npartitions=200)
             df2["Text"] = df2["index"].apply(parse_report)
-            df2 = df2.set_index("index")
+            # df2 = df2.set_index("index")
             df2.to_csv("data/{}".format(output_file), single_file=True, index=False)
 
     config["VARIABLES"] = {
@@ -123,7 +124,7 @@ def update_data(output_file=False):
         "CODE_TECHNIQUES": code_techniques,
         "NAME_TECHNIQUES": name_techniques,
         "STIX_IDENTIFIERS": stix_ids,
-        "TACTICS_TECHNIQUES_RELATIONSHIP_D": relation_df,
+        "RELATIONSHIP": relation_df,
         "TEXT_FEATURES": ["processed"],
         "ALL_TTPS": code_tactics + code_techniques,
     }
@@ -134,9 +135,15 @@ def update_data(output_file=False):
     with open("rcatt.ini", "w") as configfile:
         config.write(configfile)
 
+    if clean:
+        shutil.rmtree(TMP_PATH)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fetch new data from mitre.")
     parser.add_argument("--data", type=str, required=False)
+    parser.add_argument("--clean", action="store_true")
+
     args = parser.parse_args()
-    update_data(args.data)
+    clean = True if args.clean else False
+    update_data(args.data, args.clean)
