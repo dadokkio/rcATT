@@ -10,6 +10,8 @@ import mimetypes
 import pandas as pd
 import dask.dataframe as dd
 
+from bs4 import BeautifulSoup
+
 from newspaper import Article, Config
 from attackcti import attack_client
 from urllib.request import Request, urlopen
@@ -107,6 +109,7 @@ def update_data(output_file=False, clean=False):
     urls = {}
     for technique in tqdm(all_techniques):
         stix_ids.append(technique["id"])
+        website = technique["external_references"][0]["url"]
         technique_id = technique["external_references"][0]["external_id"]
         code_techniques.append(technique_id)
         name_techniques.append(technique["technique"])
@@ -124,14 +127,19 @@ def update_data(output_file=False, clean=False):
 
             tactic_id = code_tactics[slug_name_tactics.index(tactic)]
             relation_df.setdefault(tactic_id, [])
-            relation_df[tactic_id].append(technique_id)               
-            for url_obj in technique["external_references"]:
-                url = url_obj.get("url", None)
-                if url:
-                    urls.setdefault(url, {})
-                    urls[url][tactic_id] = 1
-                    urls[url][technique_id] = 1
+            relation_df[tactic_id].append(technique_id)
 
+            reqs = requests.get(website).text
+            soup = BeautifulSoup(reqs, "html.parser")
+
+            for url in [
+                x.a["href"]
+                for x in soup.find_all("span")
+                if x.attrs.get("class", [0])[0] == "scite-citation-text" and x.a
+            ]:
+                urls.setdefault(url, {})
+                urls[url][tactic_id] = 1
+                urls[url][technique_id] = 1
 
     if output_file:
         df = pd.DataFrame(urls)
